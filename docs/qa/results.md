@@ -57,7 +57,11 @@
 - Кэширование: `/assets/*` и `/fonts/*` — `public, max-age=31536000, immutable`; `/media/*` — `public, max-age=604800`.
 - Мобильные 390×844 и 320×700 на живом домене: горизонтального переполнения нет, видео 9:16, кнопки MAX и «Позвонить» с корректными `href`, битых изображений нет.
 - Видео на живом домене воспроизводится: `paused=false`, `currentTime>0`, `readyState=4`, `duration=27.515`, `error=null`, 1080×1920.
-- Ограничение Workers static assets: запрос `Range` возвращал `200` и весь файл без `Content-Range`/`Accept-Ranges`. Добавлен Worker-обработчик только для `/media/sax_1.mp4`; тесты `worker/range.test.mjs` — 5/5 pass, `wrangler deploy --dry-run` — успешно.
+- Ограничение Workers static assets: запрос `Range` возвращал `200` и весь файл без `Content-Range`/`Accept-Ranges`.
+- Первая версия Range-фикса использовала `run_worker_first: ["/media/sax_1.mp4"]`. На живом Worker обычный GET обрабатывался Worker, но Range-запрос к тому же URL edge отдавал напрямую (`200`, полный файл, без `Accept-Ranges`), даже с `Authorization`, `no-store` и версионного preview-домена.
+- Рабочая схема: видео публикуется по нестатическому пути `/stream/sax_1.mp4`; Worker вызывается для него всегда и читает файл из `/media/sax_1.mp4` через `env.ASSETS`. Остальные ассеты идут напрямую.
+- Локальный preview: `/stream/sax_1.mp4` → 302 → `/media/sax_1.mp4`; Range-запрос после перехода — `206`, `Content-Range: bytes 0-1023/19326111`. В браузере видео играет: `readyState=4`, `duration=27.515`, 1080×1920, `error=null`.
+- Тесты `worker/range.test.mjs` — 8/8 pass; проверка на реальном файле 19 326 111 байт (начало, середина, хвост, суффикс, полный диапазон, HEAD, 416, обычный GET) — pass; `wrangler deploy --dry-run` — успешно (33 ассета, Worker 3,16 KiB).
 
 ## Ограничения
 Нет Telegram URL и собственного домена. Не проверялись физические мобильные устройства и фактический fullscreen во встроенном Chromium. Видео оптимизировано до 19,3 МБ и загружается по запросу пользователя, не на первом экране. Range-фикс требует публикации и проверки на реальном Safari/iPhone; в текущем окружении доступен только Chromium.

@@ -1,3 +1,5 @@
+const VIDEO_PATH = '/stream/sax_1.mp4'
+const VIDEO_ASSET_PATH = '/media/sax_1.mp4'
 const RANGE_PATTERN = /^bytes=(\d*)-(\d*)$/
 
 export function parseRange(header, size) {
@@ -29,14 +31,25 @@ function responseHeaders(asset, overrides = {}) {
   return headers
 }
 
+function assetRequest(url, method) {
+  const assetUrl = new URL(url)
+  assetUrl.pathname = VIDEO_ASSET_PATH
+  assetUrl.search = ''
+  return new Request(assetUrl.toString(), { method })
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
-    if (!url.pathname.startsWith('/media/')) return env.ASSETS.fetch(request)
+    if (url.pathname !== VIDEO_PATH) return env.ASSETS.fetch(request)
+
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } })
+    }
 
     const rangeHeader = request.headers.get('Range')
     if (!rangeHeader) {
-      const asset = await env.ASSETS.fetch(request)
+      const asset = await env.ASSETS.fetch(assetRequest(url, request.method))
       return new Response(asset.body, {
         status: asset.status,
         statusText: asset.statusText,
@@ -44,9 +57,7 @@ export default {
       })
     }
 
-    if (request.method !== 'GET' && request.method !== 'HEAD') return env.ASSETS.fetch(request)
-
-    const asset = await env.ASSETS.fetch(new Request(url.toString(), { method: 'GET' }))
+    const asset = await env.ASSETS.fetch(assetRequest(url, 'GET'))
     if (!asset.ok) return asset
 
     const size = Number(asset.headers.get('Content-Length'))

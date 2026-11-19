@@ -10,6 +10,7 @@ export const media = {
   portrait: '/media/optimized/oleg-portrait.webp',
   duo: '/media/optimized/guitar-duo.webp',
   cafe: '/media/optimized/cafe-portrait.webp',
-  video: '/media/sax_1.mp4',
+  video: '/stream/sax_1.mp4',
+  videoAsset: '/media/sax_1.mp4',
   poster: '/media/optimized/video-poster.jpg',
 }

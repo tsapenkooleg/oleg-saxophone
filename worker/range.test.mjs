@@ -10,8 +10,16 @@ const asset = () => new Response(body, {
     'Cache-Control': 'public, max-age=604800',
   },
 })
-const env = { ASSETS: { fetch: async () => asset() } }
-const request = (range) => new Request('https://example.com/media/sax_1.mp4', {
+const env = {
+  ASSETS: {
+    fetch: async (request) => {
+      assert.equal(new URL(request.url).pathname, '/media/sax_1.mp4')
+      return asset()
+    },
+  },
+}
+const request = (range, method = 'GET') => new Request('https://example.com/stream/sax_1.mp4', {
+  method,
   headers: range ? { Range: range } : {},
 })
 
@@ -48,9 +56,30 @@ test('rejects an unsatisfiable range', async () => {
   assert.equal(response.headers.get('Content-Range'), 'bytes */1024')
 })
 
-test('adds Accept-Ranges to ordinary media responses', async () => {
+test('adds Accept-Ranges to ordinary stream responses', async () => {
   const response = await worker.fetch(request(null), env)
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('Accept-Ranges'), 'bytes')
   assert.deepEqual(new Uint8Array(await response.arrayBuffer()), body)
+})
+
+test('answers HEAD with range headers and no body', async () => {
+  const response = await worker.fetch(request('bytes=0-1023', 'HEAD'), env)
+  assert.equal(response.status, 206)
+  assert.equal(response.headers.get('Content-Length'), '1024')
+  assert.equal((await response.arrayBuffer()).byteLength, 0)
+})
+
+test('does not intercept other paths', async () => {
+  const calls = []
+  const passthroughEnv = { ASSETS: { fetch: async (request) => { calls.push(new URL(request.url).pathname); return new Response('asset', { status: 404 }) } } }
+  const response = await worker.fetch(new Request('https://example.com/media/sax_1.mp4'), passthroughEnv)
+  assert.equal(response.status, 404)
+  assert.deepEqual(calls, ['/media/sax_1.mp4'])
+})
+
+test('rejects unsupported methods on the stream path', async () => {
+  const response = await worker.fetch(request(null, 'POST'), env)
+  assert.equal(response.status, 405)
+  assert.equal(response.headers.get('Allow'), 'GET, HEAD')
 })
