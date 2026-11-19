@@ -56,21 +56,41 @@ WebP: полные версии суммарно 588 238 байт; дополн�
 - **Ссылка Telegram не предоставлена и в исходном проекте отсутствовала.** Добавить её в `contact.telegram` в `src/config.ts`: кнопка и упоминание автоматически появятся. Сейчас нет фиктивных или отключённых ссылок.
 - Домен не указан: перед публикацией заменить относительный `og:image` на абсолютный URL своего домена и добавить `og:url` / canonical. Домен не выдуман.
 
-## Публикация на Cloudflare Pages
+## Публикация на Cloudflare Workers
 
-Сайт — статическая сборка Vite, сервер не требуется. Бесплатный тариф Cloudflare Pages подключается к GitHub и обновляет сайт при каждом push.
+Сайт опубликован как **Cloudflare Worker со статическими ассетами**: **https://oleg-saxophone.tsapenkooleg89.workers.dev**. HTTPS включён, проект работает на бесплатном тарифе.
 
-1. Убедиться, что ветка `github-publication` запушена в `https://github.com/tsapenkooleg/oleg-saxophone`.
-2. В Cloudflare Dashboard открыть **Workers & Pages → Create → Pages → Connect to Git**.
-3. Выбрать репозиторий `tsapenkooleg/oleg-saxophone`.
-4. Production branch: `github-publication`.
-5. Build command: `npm run build`; Build output directory: `dist`.
-6. При необходимости добавить переменную окружения `NODE_VERSION=22`.
-7. Сохранить проект и запустить первый деплой. Каждый push в `github-publication` будет публиковать новую версию автоматически.
+Настройки Git-интеграции в Dashboard:
 
-Локальная проверка production-сборки: `npm run build`, затем `npm run preview` → **http://localhost:5181**.
+- репозиторий — `tsapenkooleg/oleg-saxophone`;
+- production branch — `github-publication`;
+- build command — `npm run build`;
+- deploy command — `npx wrangler deploy`;
+- root directory — `/`.
 
-Ограничения бесплатного тарифа: 500 сборок в месяц, 20 000 файлов, не более 25 МиБ на файл. Видео занимает 19,3 МБ и проходит с запасом.
+Каждый push в `github-publication` запускает сборку и публикует новую версию. Конфигурация Worker находится в `wrangler.jsonc`, точка входа — `worker/index.js`.
+
+### Range для видео
+
+Workers static assets отдают файлы целиком и не поддерживают HTTP Range; из-за этого Safari может не воспроизводить видео. Поэтому Worker перехватывает только `/media/sax_1.mp4` (`run_worker_first`) и:
+
+- без заголовка `Range` отдаёт видео как обычно и добавляет `Accept-Ranges: bytes`;
+- на корректный диапазон отвечает `206 Partial Content` с `Content-Range` и точным фрагментом;
+- на полный диапазон `bytes=0-` стримит файл без буферизации;
+- на некорректный диапазон отвечает `416 Range Not Satisfiable`.
+
+Остальные ассеты обслуживаются напрямую, без вызова Worker.
+
+```powershell
+npm run build
+node --test worker/range.test.mjs
+npx --yes wrangler@latest deploy --dry-run
+npx --yes wrangler@latest dev --port 5190
+```
+
+Локальная проверка production-сборки без Worker: `npm run preview` → **http://localhost:5181**. Проверка Worker: `http://127.0.0.1:5190`.
+
+Ограничения бесплатного тарифа Workers: 100 000 запросов в сутки, не более 25 МиБ на файл статики. Видео занимает 19,3 МБ и проходит с запасом.
 
 ## Проверки
 
@@ -79,3 +99,5 @@ Production build и TypeScript проходят. Проверены 320, 375, 39
 Lighthouse: Accessibility **100**, Best Practices **100**, SEO **100**. Встроенный аудит не измеряет Performance. Программная проверка перехода видео в fullscreen во встроенном браузере завершилась тайм-аутом; штатная кнопка браузера сохранена, её фактический переход в fullscreen здесь не подтверждён. Физические iOS/Android устройства не тестировались.
 
 Публикационная ветка — `github-publication`, remote — `https://github.com/tsapenkooleg/oleg-saxophone.git`. Исходная ветка `feat/cinematic-landing` и контрольная точка `6fc6320` не переписывались. Соседние проекты не изменялись.
+
+Живой сайт проверен 2026-11-19: HTTPS, контент и оптимизированное видео на месте, консоль без ошибок, мобильные 390×844 и 320×700 без горизонтального переполнения. Range-фикс проверяется локальными тестами `worker/range.test.mjs` и запросами к `wrangler dev`; физический Safari/iPhone в текущем окружении недоступен.

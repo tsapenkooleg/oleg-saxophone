@@ -38,7 +38,7 @@
 ## Ревью
 Один независимый review исходного кода: важных/критических дефектов не найдено. Упоминание отсутствующего Telegram сделано условным. Размеры мелких текстов увеличены. Абсолютный OG URL отложен до получения домена.
 
-## Обновление — 2026-11-19 (подготовка Cloudflare Pages)
+## Обновление — 2026-11-19 (публикация и оптимизация)
 
 - Видео перекодировано: 19 326 111 байт (18,4 МиБ), 1080×1920, 27,5 с, H.264 High CRF 23, AAC 192 kbps, `faststart`; SSIM 0.989 относительно исходника.
 - Production preview: видео воспроизводится, `paused=false`, `readyState=4`, `duration=27.515`, `error=null`; медиазапрос отдаётся с кодом 206.
@@ -47,6 +47,17 @@
 - `npm run build`: exit 0; в `dist` 29 файлов, 29,6 МБ, максимальный файл 19,3 МБ, файлов >25 МиБ нет; `performance.mp4` отсутствует, `_headers` присутствует.
 - Неиспользуемый `public/media/optimized/performance.mp4` (44,4 МиБ) удалён из публикуемого дерева; резервная копия — в игнорируемой `.tools/source/`, история Git сохранена.
 - Битая ссылка `/media/Vid_sax.mp4` в сообщении об ошибке видео заменена на актуальный `media.video`.
+- Push `90cfae2..b2f085e` выполнен в `origin/github-publication` без force.
+
+## Живой сайт — 2026-11-19
+
+- URL: **https://oleg-saxophone.tsapenkooleg89.workers.dev**; HTTPS работает, сертификат Cloudflare.
+- Фактический тип публикации — Cloudflare Worker со static assets, не Pages. Git-интеграция настроена: repo `tsapenkooleg/oleg-saxophone`, production branch `github-publication`, build `npm run build`, deploy `npx wrangler deploy`, root `/`.
+- Контент, шрифты, изображения и оптимизированное видео загружаются; консоль без ошибок.
+- Кэширование: `/assets/*` и `/fonts/*` — `public, max-age=31536000, immutable`; `/media/*` — `public, max-age=604800`.
+- Мобильные 390×844 и 320×700 на живом домене: горизонтального переполнения нет, видео 9:16, кнопки MAX и «Позвонить» с корректными `href`, битых изображений нет.
+- Видео на живом домене воспроизводится: `paused=false`, `currentTime>0`, `readyState=4`, `duration=27.515`, `error=null`, 1080×1920.
+- Ограничение Workers static assets: запрос `Range` возвращал `200` и весь файл без `Content-Range`/`Accept-Ranges`. Добавлен Worker-обработчик только для `/media/sax_1.mp4`; тесты `worker/range.test.mjs` — 5/5 pass, `wrangler deploy --dry-run` — успешно.
 
 ## Ограничения
-Нет Telegram URL и production-домена. Не проверялись физические мобильные устройства и фактический fullscreen во встроенном Chromium. Видео оптимизировано до 19,3 МБ и загружается по запросу пользователя, не на первом экране. Публикация на Cloudflare Pages и push требуют подтверждения владельца и авторизации Cloudflare/GitHub.
+Нет Telegram URL и собственного домена. Не проверялись физические мобильные устройства и фактический fullscreen во встроенном Chromium. Видео оптимизировано до 19,3 МБ и загружается по запросу пользователя, не на первом экране. Range-фикс требует публикации и проверки на реальном Safari/iPhone; в текущем окружении доступен только Chromium.
